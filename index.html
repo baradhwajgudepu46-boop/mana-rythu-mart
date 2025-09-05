@@ -220,11 +220,16 @@
         <p>Scan the QR code below to pay.</p>
         <div style="font-size:1.2rem; margin:8px 0">Amount: <b id="pay-amount">₹0.00</b></div>
         <img src="https://lh3.googleusercontent.com/d/17r48JjzNwt0UtjnOOpW5ByQQrNQzZD-5" alt="UPI QR" style="width:240px; margin:0 auto; border:1px solid #ddd; border-radius:8px">
-        <div class="row" style="justify-content:center; margin-top:10px">
-          <button id="btn-open-upi" class="pill">Open UPI App</button>
-          <button id="btn-paid" class="pill" style="background:var(--info)">I have paid</button>
+        <div id="upi-options" style="margin-top:10px;">
+          <div class="row" style="justify-content:center; margin-top:10px; flex-wrap: nowrap; overflow-x: auto;">
+              <a class="pill" id="gpay-link" style="white-space: nowrap;">Google Pay</a>
+              <a class="pill" id="phonepe-link" style="white-space: nowrap;">PhonePe</a>
+              <a class="pill" id="paytm-link" style="white-space: nowrap;">Paytm</a>
+              <a class="pill" id="other-upi-link" style="white-space: nowrap;">Other UPI Apps</a>
+          </div>
         </div>
         <div style="margin-top:8px; color:#666">UPI ID: <b id="upi-id">9491774950@ybl</b></div>
+        <button id="btn-paid" class="pill" style="background:var(--info); margin-top:10px;">I have paid</button>
       </section>
 
       <!-- ADMIN -->
@@ -281,4 +286,618 @@
       <div id="m-body"></div>
       <div class="footer" id="m-foot"></div>
     </div>
-  </div
+  </div>
+  <script type="module">
+    /* =========================
+       Firebase (Modular v12)
+    ==========================*/
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import {
+      getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+      createUserWithEmailAndPassword, sendPasswordResetEmail, signOut,
+      setPersistence, browserLocalPersistence
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+    import {
+      getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
+      updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+    // >>>>>>> REPLACE WITH YOUR OWN CONFIG IF NEEDED <<<<<<<
+    const firebaseConfig = {
+      apiKey: "AIzaSyAb1dGJmkTyAdAw3UzeZOg9lHRQsgqHtiA",
+      authDomain: "mana-rythu-mart-ae759.firebaseapp.com",
+      projectId: "mana-rythu-mart-ae759",
+      storageBucket: "mana-rythu-mart-ae759.firebasestorage.app",
+      messagingSenderId: "484608823115",
+      appId: "1:484608823115:web:cb854b3d3cd08bc9c22ce",
+      measurementId: "G-QL84PQX2GV"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    await setPersistence(auth, browserLocalPersistence);
+    /* =========================
+       Elements
+    ==========================*/
+    const loginPane = document.getElementById('login-pane');
+    const authMsg = document.getElementById('auth-msg');
+    const btnAuth = document.getElementById('btn-auth');
+    const adminLink = document.getElementById('admin-link');
+    const appContent = document.getElementById('app-content');
+    const header = document.querySelector('header');
+    const main = document.querySelector('main');
+    const pages = {
+      home: document.getElementById('page-home'),
+      cart: document.getElementById('page-cart'),
+      orders: document.getElementById('page-orders'),
+      admin: document.getElementById('page-admin'),
+      pay: document.getElementById('page-pay'),
+    };
+    const productsGrid = document.getElementById('products');
+    const search = document.getElementById('search');
+    const cartWrap = document.getElementById('cart');
+    const cartCount = document.getElementById('cart-count');
+    const cartTotal = document.getElementById('cart-total');
+    const ordersWrap = document.getElementById('orders');
+    const prodForm = document.getElementById('prod-form');
+    const prodId = document.getElementById('prod-id');
+    const prodName = document.getElementById('prod-name');
+    const prodDesc = document.getElementById('prod-desc');
+    const prodPrice = document.getElementById('prod-price');
+    const prodImg = document.getElementById('prod-img');
+    const prodCat = document.getElementById('prod-cat');
+    const prodSubmit = document.getElementById('prod-submit');
+    const prodReset = document.getElementById('prod-reset');
+    const seedBtn = document.getElementById('seed');
+    const adminOrders = document.getElementById('admin-orders');
+    const adminProds = document.getElementById('admin-prods');
+    const orderFilter = document.getElementById('order-filter');
+    const loginForm = document.getElementById('login-form');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const togglePass = document.getElementById('toggle-pass');
+    const btnSignup = document.getElementById('btn-signup');
+    const btnReset = document.getElementById('btn-reset');
+    const checkout = document.getElementById('checkout');
+    const cname = document.getElementById('cust-name');
+    const cphone = document.getElementById('cust-phone');
+    const caddr = document.getElementById('cust-address');
+    const paySel = document.getElementById('pay');
+    const payPageAmount = document.getElementById('pay-amount');
+    const btnOpenUpi = document.getElementById('btn-open-upi');
+    const btnPaid = document.getElementById('btn-paid');
+    const upiIdSpan = document.getElementById('upi-id');
+    const upiOptions = document.getElementById('upi-options');
+    const UPI_ID = '9491774950@ybl';
+    // modal
+    const modal = document.getElementById('modal');
+    const M = {
+      open(title, bodyHtml, buttonsHtml){
+        document.getElementById('m-title').innerHTML = title;
+        document.getElementById('m-body').innerHTML = bodyHtml;
+        document.getElementById('m-foot').innerHTML = buttonsHtml || '<button class="pill" onclick="document.getElementById(\'modal\').style.display=\'none\'">OK</button>';
+        modal.style.display = 'block';
+      },
+      close(){ modal.style.display = 'none'; }
+    };
+    window.addEventListener('click', (e)=>{ if(e.target === modal) M.close(); });
+    /* =========================
+       State
+    ==========================*/
+    let currentUser = null;
+    let isAdmin = false;
+    let products = [];
+    let cart = {}; // {productId: qty}
+    let allOrders = [];
+    let lastOrderId = null;
+    let lastOrderTotal = 0;
+    function showPage(key){
+      Object.entries(pages).forEach(([k, el]) => el.hidden = (k !== key));
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+    function formatINR(n){ return new Intl.NumberFormat('en-IN',{style:'currency', currency:'INR'}).format(n || 0); }
+    /* =========================
+       Auth
+    ==========================*/
+    togglePass.addEventListener('click', ()=>{
+      const t = password.getAttribute('type') === 'password' ? 'text' : 'password';
+      password.setAttribute('type', t);
+    });
+    loginForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      authMsg.textContent = '';
+      try{
+        await signInWithEmailAndPassword(auth, email.value.trim(), password.value);
+      }catch(err){
+        authMsg.textContent = err.message;
+      }
+    });
+    btnSignup.addEventListener('click', async ()=>{
+      authMsg.textContent = '';
+      try{
+        const cred = await createUserWithEmailAndPassword(auth, email.value.trim(), password.value);
+        // create user doc
+        await setDoc(doc(db, 'users', cred.user.uid), {
+          email: cred.user.email, isAdmin: false, createdAt: serverTimestamp(), status:'active'
+        });
+      }catch(err){
+        authMsg.textContent = err.message;
+      }
+    });
+    btnReset.addEventListener('click', async ()=>{
+      authMsg.textContent = '';
+      if(!email.value.trim()) { authMsg.textContent = 'Enter your email first.'; return; }
+      try{
+        await sendPasswordResetEmail(auth, email.value.trim());
+        authMsg.style.color = 'green';
+        authMsg.textContent = 'Reset link sent (if account exists).';
+      }catch(err){
+        authMsg.style.color = 'var(--danger)';
+        authMsg.textContent = err.message;
+      }
+    });
+    btnAuth.addEventListener('click', async ()=>{
+      if(currentUser){ await signOut(auth); } else {
+        loginPane.hidden = false;
+        appContent.hidden = true;
+      }
+    });
+    onAuthStateChanged(auth, async (user)=>{
+      currentUser = user || null;
+      if(user){
+        // pull admin flag
+        try{
+          const u = await getDoc(doc(db, 'users', user.uid));
+          isAdmin = u.exists() && u.data().isAdmin === true;
+        }catch{ isAdmin = false; }
+        btnAuth.textContent = 'Logout';
+        adminLink.style.display = isAdmin ? 'inline-block' : 'none';
+        loginPane.hidden = true;
+        appContent.hidden = false;
+        showPage('home');
+        // start listeners
+        listenProducts();
+        listenCart();
+        listenOrders();
+        setupDynamicEventListeners();
+      }else{
+        isAdmin = false;
+        btnAuth.textContent = 'Login';
+        adminLink.style.display = 'none';
+        products = [];
+        cart = {};
+        updateCartUI();
+        ordersWrap.innerHTML = '';
+        
+        // Hide all main content and show login pane
+        loginPane.hidden = false;
+        appContent.hidden = true;
+        
+        listenProducts();
+      }
+    });
+    function setupDynamicEventListeners() {
+      // These elements are initially hidden, so their listeners need to be attached after they exist
+      if(document.getElementById('gpay-link')) {
+        document.getElementById('gpay-link').addEventListener('click', ()=>{
+          const upiLink = `gpay://upi/pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
+          window.location.href = upiLink;
+        });
+      }
+      if(document.getElementById('phonepe-link')) {
+        document.getElementById('phonepe-link').addEventListener('click', ()=>{
+          const upiLink = `phonepe://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
+          window.location.href = upiLink;
+        });
+      }
+      if(document.getElementById('paytm-link')) {
+        document.getElementById('paytm-link').addEventListener('click', ()=>{
+          const upiLink = `paytmmp://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
+          window.location.href = upiLink;
+        });
+      }
+      if(document.getElementById('other-upi-link')) {
+        document.getElementById('other-upi-link').addEventListener('click', ()=>{
+          const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
+          window.location.href = upiLink;
+        });
+      }
+      if(btnPaid) {
+        btnPaid.addEventListener('click', async ()=>{
+          if(!lastOrderId) return;
+          try{
+            await updateDoc(doc(db, 'orders', lastOrderId), { status: 'Pending Confirmation' });
+            M.open('Thanks!','We\'ve marked your payment as pending confirmation.');
+            showPage('orders');
+          }catch(e){ M.open('Error', e.message); }
+        });
+      }
+      if(seedBtn) {
+        seedBtn.addEventListener('click', async ()=>{
+          if(!isAdmin) return M.open('Denied','Admin only.');
+          const demo = [
+            {name:'Tomatoes (1kg)', price: 40, category:'vegetables', image:'https://placehold.co/600x400?text=Tomatoes', description:'Fresh local tomatoes', status:'active'},
+            {name:'Bananas (1doz)', price: 60, category:'fruits', image:'https://placehold.co/600x400?text=Bananas', description:'Sweet and ripe', status:'active'},
+            {name:'Onions (1kg)', price: 30, category:'vegetables', image:'https://placehold.co/600x400?text=Onions', description:'Everyday cooking', status:'active'},
+          ];
+          try{
+            await Promise.all(demo.map(d => addDoc(collection(db,'products'), d)));
+            M.open('Seeded','Demo products added.');
+          }catch(e){ M.open('Error', e.message); }
+        });
+      }
+    }
+    /* =========================
+       NAV
+    ==========================*/
+    document.querySelectorAll('nav [data-goto]').forEach(a=>{
+      a.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const pg = a.dataset.goto;
+        if(!currentUser && (pg==='cart' || pg==='orders' || pg==='admin')){
+          loginPane.hidden=false;
+          return M.open('Login required', 'Please login to access this page.');
+        }
+        if(pg==='admin' && !isAdmin){
+          return M.open('Permission denied', 'You are not an admin.');
+        }
+        showPage(pg);
+      });
+    });
+    /* =========================
+       Firestore listeners
+    ==========================*/
+    function listenProducts(){
+      onSnapshot(collection(db, 'products'), (snap)=>{
+        products = snap.docs.map(d=>({id:d.id, ...d.data()}));
+        renderProducts();
+        if(isAdmin) renderAdminProducts();
+      }, err => console.error('products listener', err));
+    }
+    function listenCart(){
+      if(!currentUser) return;
+      onSnapshot(collection(db, `users/${currentUser.uid}/cart`), (snap)=>{
+        cart = {};
+        snap.forEach(d=> cart[d.id] = d.data().quantity || 0);
+        updateCartUI();
+        // The fix is here! Re-render products to show quantity controls
+        renderProducts();
+      }, err => console.error('cart listener', err));
+    }
+    function listenOrders(){
+      if(!currentUser) return;
+      const qy = query(collection(db, 'orders'), where('userId','==', currentUser.uid));
+      onSnapshot(qy, (snap)=>{
+        const arr = snap.docs.map(d=>({id:d.id, ...d.data()}));
+        renderOrders(arr);
+      }, err => console.error('orders listener', err));
+      if(isAdmin){
+        onSnapshot(collection(db, 'orders'), (snap)=>{
+          allOrders = snap.docs.map(d=>({id:d.id, ...d.data()}));
+          renderAdminOrders();
+        });
+      }
+    }
+    /* =========================
+       PRODUCTS (Home)
+    ==========================*/
+    function productCard(p){
+      const q = cart[p.id] || 0;
+      return `
+        <div class="card">
+          <img src="${p.image || 'https://placehold.co/600x400?text=No+Image'}" alt="${p.name}" onerror="this.src='https://placehold.co/600x400?text=No+Image'">
+          <div class="name">${p.name}</div>
+          <div style="color:#666; min-height:36px">${p.description || ''}</div>
+          <div class="row" style="justify-content:space-between; margin-top:6px">
+            <div class="price">${formatINR(p.price||0)}</div>
+            ${q>0
+              ? `<div class="qty">
+                    <button onclick="updateCart('${p.id}',-1)">-</button>
+                    <b>${q}</b>
+                    <button onclick="updateCart('${p.id}',1)">+</button>
+                 </div>`
+              : `<button class="pill" onclick="addToCart('${p.id}')">Add to Cart</button>`
+            }
+          </div>
+        </div>
+      `;
+    }
+    function renderProducts(list = products){
+      const active = list.filter(p => (p.status || 'active') !== 'disabled');
+      productsGrid.innerHTML = active.length ? active.map(productCard).join('') : '<div class="card">No products available.</div>';
+    }
+    search.addEventListener('input', (e)=>{
+      const t = e.target.value.toLowerCase();
+      const f = products.filter(p => (p.name||'').toLowerCase().includes(t) || (p.category||'').toLowerCase().includes(t));
+      renderProducts(f);
+    });
+    /* =========================
+       CART
+    ==========================*/
+    window.addToCart = async function(id){
+      if(!currentUser) return M.open('Login required','Please login to add to cart.');
+      const ref = doc(db, `users/${currentUser.uid}/cart`, id);
+      try{
+        const snap = await getDoc(ref);
+        if(snap.exists()){
+          await updateDoc(ref, { quantity: (snap.data().quantity || 0) + 1 });
+        }else{
+          await setDoc(ref, { quantity: 1 });
+        }
+      }catch(e){ M.open('Error', e.message); }
+    }
+    window.updateCart = async function(id, delta){
+      const ref = doc(db, `users/${currentUser.uid}/cart`, id);
+      try{
+        const snap = await getDoc(ref);
+        if(!snap.exists() && delta<0) return;
+        const q = (snap.exists()? snap.data().quantity : 0) + delta;
+        if(q>0) await updateDoc(ref, { quantity:q }); else await deleteDoc(ref);
+      }catch(e){ M.open('Error', e.message); }
+    }
+    function updateCartUI(){
+      const ids = Object.keys(cart);
+      const items = ids.map(id => ({...products.find(p=>p.id===id), id, quantity: cart[id]})).filter(Boolean);
+      let total = 0;
+      cartWrap.innerHTML = items.length ? '' : '<div>No items in cart.</div>';
+      items.forEach(it=>{
+        const line = (it.price || 0) * (it.quantity || 0);
+        total += line;
+        const row = document.createElement('div');
+        row.className = 'cart-item';
+        row.innerHTML = `
+          <div><b>${it.name}</b> — ${formatINR(it.price)} × ${it.quantity}</div>
+          <div class="qty">
+            <button onclick="updateCart('${it.id}',-1)">-</button>
+            <b>${it.quantity}</b>
+            <button onclick="updateCart('${it.id}',1)">+</button>
+          </div>
+        `;
+        cartWrap.appendChild(row);
+      });
+      cartTotal.textContent = 'Total: ' + formatINR(total);
+      cartCount.textContent = items.reduce((s,i)=>s+(i.quantity||0),0);
+    }
+    /* =========================
+       CHECKOUT
+    ==========================*/
+    checkout.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const ids = Object.keys(cart);
+      if(ids.length===0) return M.open('Empty Cart','Add some products first.');
+      const items = ids.map(id=>{
+        const p = products.find(pp=>pp.id===id);
+        return { productId:id, quantity:cart[id], price:p?.price||0 };
+      });
+      const total = items.reduce((s,i)=> s + i.price*i.quantity, 0);
+      const method = paySel.value;
+      try{
+        const orderRef = await addDoc(collection(db, 'orders'), {
+          userId: currentUser.uid,
+          customerName: cname.value.trim(),
+          customerPhone: cphone.value.trim(),
+          customerAddress: caddr.value.trim(),
+          items, total,
+          paymentMethod: method,
+          status: method==='upi' ? 'Pending Payment' : 'Pending',
+          timestamp: serverTimestamp()
+        });
+        // clear cart
+        const c = await getDocs(collection(db, `users/${currentUser.uid}/cart`));
+        for(const d of c.docs) await deleteDoc(d.ref);
+        if(method==='upi'){
+          lastOrderId = orderRef.id;
+          lastOrderTotal = total;
+          payPageAmount.textContent = formatINR(total);
+          showPage('pay');
+        }else{
+          M.open('Order placed', 'Your order has been placed successfully.');
+          showPage('orders');
+        }
+      }catch(err){
+        M.open('Error', err.message);
+      }
+    });
+    /* =========================
+       ORDERS (customer)
+    ==========================*/
+    function renderOrders(arr){
+      if(!arr || arr.length===0){ ordersWrap.innerHTML = '<div>No orders yet.</div>'; return; }
+      arr.sort((a,b)=> (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+      ordersWrap.innerHTML = arr.map(o=>{
+        const s = (o.status||'Pending');
+        const cls = s==='Pending' ? 's-pending'
+                : s==='Pending Payment' ? 's-pendingpay'
+                : s==='Pending Confirmation' ? 's-pendingpay'
+                : s==='Confirmed' ? 's-confirmed'
+                : s==='Shipped' ? 's-shipped'
+                : s==='Delivered' ? 's-delivered'
+                : 's-cancelled';
+        const items = (o.items||[]).map(i=>{
+          const p = products.find(pp=>pp.id===i.productId);
+          return `<li>${p?.name || 'Item'} × ${i.quantity}</li>`;
+        }).join('');
+        const dt = o.timestamp?.seconds ? new Date(o.timestamp.seconds*1000) : null;
+        return `
+          <div class="card" style="border-left:5px solid var(--brand-2)">
+            <div class="row" style="justify-content:space-between">
+              <b>Order: ${o.id}</b>
+              <span class="chip ${cls}">${s}</span>
+            </div>
+            <div style="margin:6px 0">${dt ? dt.toLocaleString() : ''}</div>
+            <div><b>Total:</b> ${formatINR(o.total||0)}</div>
+            <div style="margin-top:8px"><b>Items:</b><ul style="margin:6px 0 0; padding-left:18px">${items}</ul></div>
+            ${s==='Pending Payment' ? `<button class="pill" style="margin-top:10px" onclick="retryPay('${o.id}', ${o.total||0})">Pay Now</button>`:''}
+          </div>
+        `;
+      }).join('');
+    }
+    window.retryPay = function(id, total){
+      lastOrderId = id; lastOrderTotal = total;
+      payPageAmount.textContent = formatINR(total);
+      showPage('pay');
+    }
+    /* =========================
+       ADMIN
+    ==========================*/
+    function renderAdminOrders(){
+      const filter = orderFilter.value;
+      const list = filter==='all' ? allOrders : allOrders.filter(o => (o.status||'Pending')===filter);
+      if(list.length===0){ adminOrders.innerHTML = '<tr><td data-k="Info" colspan="6">No orders.</td></tr>'; return; }
+      adminOrders.innerHTML = list.map(o=>{
+        const dt = o.timestamp?.seconds ? new Date(o.timestamp.seconds*1000).toLocaleString() : '';
+        const cust = `${o.customerName||''} ${o.customerPhone? '('+o.customerPhone+')':''}`;
+        const status = o.status || 'Pending';
+        return `
+          <tr>
+            <td data-k="Order ID">${o.id}</td>
+            <td data-k="Customer">${cust}</td>
+            <td data-k="Total">${formatINR(o.total||0)}</td>
+            <td data-k="Status"><span class="chip s-${status.replace(' ','').toLowerCase()}">${status}</span></td>
+            <td data-k="Date">${dt}</td>
+            <td data-k="Actions">
+              <button class="pill alt" onclick="viewOrder('${o.id}')">View</button>
+              <button class="pill alt" onclick="openUpdateOrderModal('${o.id}')">Update</button>
+              <button class="pill alt" onclick="delOrder('${o.id}')">Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+    window.openUpdateOrderModal = function(id){
+      const o = allOrders.find(x=>x.id===id); if(!o) return;
+      M.open('Update Order',`
+        <div style="margin-bottom:8px">Order ID: <b>${o.id}</b></div>
+        <form id="update-order-form">
+          <label class="label" for="update-status">Status</label>
+          <select id="update-status" class="field">
+            ${['Pending','Pending Payment','Pending Confirmation','Confirmed','Shipped','Delivered','Cancelled'].map(s=>`<option ${s===(o.status||'Pending')?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </form>
+      `, `<button class="pill alt" onclick="M.close()">Cancel</button><button class="pill" onclick="saveOrderUpdate('${o.id}')">Update</button>`);
+    };
+    window.saveOrderUpdate = async function(id){
+      if(!isAdmin) return M.open('Denied','Admin only.');
+      const newStatus = document.getElementById('update-status').value;
+      try{
+        await updateDoc(doc(db,'orders',id), {status:newStatus});
+        M.open('Updated','Order updated successfully.');
+      }catch(e){ M.open('Error', e.message); }
+    };
+    orderFilter.addEventListener('change', renderAdminOrders);
+    window.setOrderStatus = async function(id, s){
+      if(!isAdmin) return M.open('Denied','Admin only.');
+      try{ await updateDoc(doc(db,'orders',id), {status:s}); }
+      catch(e){ M.open('Error', e.message); }
+    }
+    window.viewOrder = function(id){
+      const o = allOrders.find(x=>x.id===id); if(!o) return;
+      const items = (o.items||[]).map(i=>{
+        const p = products.find(pp=>pp.id===i.productId);
+        return `<li>${p?.name || i.productId} — ${i.quantity} × ${formatINR(i.price||0)}</li>`;
+      }).join('');
+      M.open('Order Details', `
+        <div><b>Customer:</b> ${o.customerName||''} ${o.customerPhone? '('+o.customerPhone+')':''}</div>
+        <div><b>Address:</b> ${o.customerAddress||''}</div>
+        <div><b>Total:</b> ${formatINR(o.total||0)}</div>
+        <hr>
+        <div><b>Items:</b><ul style="margin:6px 0 0; padding-left:18px">${items||'<li>None</li>'}</ul></div>
+      `);
+    }
+    window.delOrder = function(id){
+      if(!isAdmin) return M.open('Denied','Admin only.');
+      M.open('Delete Order','Are you sure?', `
+        <button class="pill alt" onclick="document.getElementById('modal').style.display='none'">Cancel</button>
+        <button class="pill" onclick="confirmDelOrder('${id}')">Delete</button>
+      `);
+    }
+    window.confirmDelOrder = async function(id){
+      try{ await deleteDoc(doc(db,'orders',id)); M.close(); }
+      catch(e){ M.open('Error', e.message); }
+    }
+    function renderAdminProducts(){
+      if(products.length===0){ adminProds.innerHTML = '<div>No products yet.</div>'; return; }
+      adminProds.innerHTML = products.map(p=>`
+        <div class="card" style="display:grid; grid-template-columns:80px 1fr auto; gap:10px; align-items:center">
+          <img src="${p.image || 'https://placehold.co/80'}" alt="${p.name}">
+          <div>
+            <div class="name">${p.name}</div>
+            <div>${formatINR(p.price||0)} · <span style="color:#666">${p.category||'—'}</span></div>
+            <div>Status: <b>${p.status || 'active'}</b></div>
+          </div>
+          <div class="row">
+            <button class="pill alt" onclick="editProd('${p.id}')">Edit</button>
+            <button class="pill alt" onclick="delProd('${p.id}')">Delete</button>
+            <button class="pill" onclick="toggleProd('${p.id}','${p.status||'active'}')">${(p.status||'active')==='active'?'Disable':'Enable'}</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    window.editProd = function(id){
+      const p = products.find(x=>x.id===id); if(!p) return;
+      prodId.value = p.id; prodName.value = p.name; prodDesc.value = p.description||''; prodPrice.value = p.price||0;
+      prodImg.value = p.image||''; prodCat.value = p.category||'';
+      prodSubmit.textContent = 'Update Product';
+      showPage('admin');
+    }
+    window.delProd = function(id){
+      if(!isAdmin) return M.open('Denied','Admin only.');
+      M.open('Delete Product','Are you sure?', `
+        <button class="pill alt" onclick="document.getElementById('modal').style.display='none'">Cancel</button>
+        <button class="pill" onclick="confirmDelProd('${id}')">Delete</button>
+      `);
+    }
+    window.confirmDelProd = async function(id){
+      try{ await deleteDoc(doc(db,'products',id)); M.close(); }
+      catch(e){ M.open('Error', e.message); }
+    }
+    window.toggleProd = async function(id, status){
+      if(!isAdmin) return M.open('Denied','Admin only.');
+      try{ await updateDoc(doc(db,'products',id), {status: status==='active'?'disabled':'active'}); }
+      catch(e){ M.open('Error', e.message); }
+    }
+    prodReset.addEventListener('click', ()=>{
+      prodForm.reset(); prodId.value=''; prodSubmit.textContent='Add Product';
+    });
+    prodForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      if(!isAdmin) return M.open('Denied','Admin only.');
+      const data = {
+        name: prodName.value.trim(),
+        description: prodDesc.value.trim(),
+        price: parseFloat(prodPrice.value) || 0,
+        image: prodImg.value.trim(),
+        category: prodCat.value.trim(),
+        status: 'active'
+      };
+      try{
+        if(prodId.value){
+          await updateDoc(doc(db,'products',prodId.value), data);
+          M.open('Updated','Product updated.');
+        }else{
+          await addDoc(collection(db,'products'), data);
+          M.open('Added','Product added.');
+        }
+        prodForm.reset(); prodId.value=''; prodSubmit.textContent='Add Product';
+      }catch(e){ M.open('Error', e.message); }
+    });
+    /* =========================
+       SMALL UTILITIES
+    ==========================*/
+    // quick route helpers from hash
+    window.addEventListener('hashchange', ()=>{
+      const h = (location.hash||'').replace('#','');
+      const valid = ['home','cart','orders','admin'];
+      if(valid.includes(h)){
+        if(!currentUser && (h==='cart' || h==='orders' || h==='admin')){
+          loginPane.hidden=false;
+        }
+        if(!currentUser && (h==='cart' || h==='orders' || h==='admin')) return M.open('Login required','Please login first.');
+        if(h==='admin' && !isAdmin) return M.open('Permission denied','Admins only.');
+        showPage(h);
+      }
+    });
+    // expose a couple for inline handlers
+    window.retryPayment = window.retryPay;
+  </script>
+</body>
+</html>
