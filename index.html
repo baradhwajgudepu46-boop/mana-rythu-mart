@@ -112,7 +112,7 @@
       .logo img{height:32px;}
       .logo .title{font-size:1.1rem;}
       nav{flex-direction:column; gap:4px; width:100%; align-items:flex-start;}
-      .search{width:90%;}
+      .search{width:70%; margin:0 auto;} /* Adjusted width */
       .search input{
         width:100%;
         padding: 8px 12px;
@@ -221,6 +221,7 @@
         <div style="font-size:1.2rem; margin:8px 0">Amount: <b id="pay-amount">₹0.00</b></div>
         <img src="https://lh3.googleusercontent.com/d/17r48JjzNwt0UtjnOOpW5ByQQrNQzZD-5" alt="UPI QR" style="width:240px; margin:0 auto; border:1px solid #ddd; border-radius:8px">
         <div id="upi-options" style="margin-top:10px;">
+          <p style="font-size:0.9rem; color:var(--muted); margin-bottom:8px;">Payment apps will work only on mobile. On a desktop, please use the QR code.</p>
           <div class="row" style="justify-content:center; margin-top:10px; flex-wrap: nowrap; overflow-x: auto;">
               <a class="pill" id="gpay-link" style="white-space: nowrap;">Google Pay</a>
               <a class="pill" id="phonepe-link" style="white-space: nowrap;">PhonePe</a>
@@ -245,8 +246,8 @@
           <input class="field" id="prod-cat" placeholder="Category (fruits, vegetables…)">
           <div class="row">
             <button class="pill" type="submit" id="prod-submit">Add Product</button>
-            <button class="pill alt" type="button" id="prod-reset">Reset</button>
-            <button class="pill alt" type="button" id="seed" title="Add a few demo products">Seed Demo</button>
+            <button type="button" id="prod-reset" class="pill alt">Reset</button>
+            <button type="button" id="seed" title="Add a few demo products" class="pill alt">Seed Demo</button>
           </div>
         </form>
         <h3>Manage Orders</h3>
@@ -363,7 +364,6 @@
     const caddr = document.getElementById('cust-address');
     const paySel = document.getElementById('pay');
     const payPageAmount = document.getElementById('pay-amount');
-    const btnOpenUpi = document.getElementById('btn-open-upi');
     const btnPaid = document.getElementById('btn-paid');
     const upiIdSpan = document.getElementById('upi-id');
     const upiOptions = document.getElementById('upi-options');
@@ -480,25 +480,25 @@
       if(document.getElementById('gpay-link')) {
         document.getElementById('gpay-link').addEventListener('click', ()=>{
           const upiLink = `gpay://upi/pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
-          window.location.href = upiLink;
+          window.open(upiLink, '_blank');
         });
       }
       if(document.getElementById('phonepe-link')) {
         document.getElementById('phonepe-link').addEventListener('click', ()=>{
           const upiLink = `phonepe://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
-          window.location.href = upiLink;
+          window.open(upiLink, '_blank');
         });
       }
       if(document.getElementById('paytm-link')) {
         document.getElementById('paytm-link').addEventListener('click', ()=>{
           const upiLink = `paytmmp://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
-          window.location.href = upiLink;
+          window.open(upiLink, '_blank');
         });
       }
       if(document.getElementById('other-upi-link')) {
         document.getElementById('other-upi-link').addEventListener('click', ()=>{
           const upiLink = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent('Mana Rythu Mart')}&am=${lastOrderTotal.toFixed(2)}&cu=INR&tn=${encodeURIComponent('Order '+lastOrderId)}`;
-          window.location.href = upiLink;
+          window.open(upiLink, '_blank');
         });
       }
       if(btnPaid) {
